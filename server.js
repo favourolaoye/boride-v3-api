@@ -3,7 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors"
 import helmet from "helmet";
 import studentRoutes from "./routes/studentRoutes.js";
-dotenv()
+dotenv.config()
 
 // started the express app
 const app = express()
