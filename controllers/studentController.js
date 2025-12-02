@@ -1,7 +1,7 @@
 import Student from "../models/student.js";
 import bcrypt from "bcryptjs";
 import { isValidEmail, isValidMatricNumber } from "../utils/validator.js";
-import { signToken } from "../utils/jwt.js";
+import { signToken } from "../utils/jwts.js";
 
 export async function registerStudent(req, res) {
     try {
