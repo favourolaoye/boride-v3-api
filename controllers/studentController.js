@@ -84,3 +84,86 @@ export async function registerStudent(req, res) {
 }
 
 // Login
+export async function loginStudent(req, res) {
+    try {
+        const { email, password, matricNo } = req.body;
+
+        // Must provide email or matric number
+        if (!email && !matricNo) {
+            return res.status(400).json({
+                status: "fail",
+                message: "Provide email or matricNo to login",
+            });
+        }
+
+        // Password required
+        if (!password) {
+            return res.status(400).json({
+                status: "fail",
+                message: "Password is required",
+            });
+        }
+
+        // Validate email if provided
+        if (email && !isValidEmail(email)) {
+            return res.status(400).json({
+                status: "fail",
+                message: "Invalid student email format",
+            });
+        }
+
+        // Validate matric if provided
+        if (matricNo && !isValidMatricNumber(matricNo)) {
+            return res.status(400).json({
+                status: "fail",
+                message: "Invalid matric number format (YY/NNNN)",
+            });
+        }
+
+        // Find student by email or matric
+        const student = await Student.findOne({
+            $or: [{ email }, { matricNo }],
+        });
+
+        if (!student) {
+            return res.status(404).json({
+                status: "fail",
+                message: "Student not found",
+            });
+        }
+
+        // Check password
+        const isMatch = await bcrypt.compare(password, student.password);
+        if (!isMatch) {
+            return res.status(401).json({
+                status: "fail",
+                message: "Incorrect password",
+            });
+        }
+
+        // Generate JWT
+        const token = generateToken({
+            id: student._id,
+            email: student.email,
+            matricNo: student.matricNo,
+        });
+
+        return res.status(200).json({
+            status: "success",
+            message: "Login successful",
+            token,
+            student: {
+                id: student._id,
+                fullName: student.fullName,
+                email: student.email,
+                matricNo: student.matricNo,
+            },
+        });
+    } catch (err) {
+        console.error("Login Error:", err);
+        return res.status(500).json({
+            status: "error",
+            message: "Internal server error",
+        });
+    }
+}
