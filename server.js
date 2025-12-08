@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors"
 import helmet from "helmet";
 import studentRoutes from "./routes/studentRoutes.js";
+import { connectDB } from "./db/conn.js";
 dotenv.config()
 
 // started the express app
@@ -10,9 +11,11 @@ const app = express()
 const PORT = 5000 || process.env.DEV_PORT
 
 // middleware
+app.use(express.json())
 app.use(cors())
 app.use(helmet())
- 
+
+connectDB()
 
 // api routes
 app.use("/api/student", studentRoutes)

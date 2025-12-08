@@ -5,7 +5,7 @@ import { signToken } from "../utils/jwts.js";
 
 export async function registerStudent(req, res) {
     try {
-        const { email, matricNo, fullName, password } = req.body;
+        const {email, matricNo, fullName, password } = req.body;
 
         if (!email || !matricNo || !fullName || !password) {
             return res.status(400).json({
