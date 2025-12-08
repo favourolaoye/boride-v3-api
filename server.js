@@ -3,6 +3,7 @@ import dotenv from "dotenv";
 import cors from "cors"
 import helmet from "helmet";
 import studentRoutes from "./routes/studentRoutes.js";
+import driverRoutes from "./routes/driverRoutes.js";
 import { connectDB } from "./db/conn.js";
 dotenv.config()
 
@@ -19,6 +20,7 @@ connectDB()
 
 // api routes
 app.use("/api/student", studentRoutes)
+app.use("/api/driver", driverRoutes)
 
 // app listening to requests
 app.listen(PORT, (req,res) => {

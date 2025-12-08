@@ -2,6 +2,11 @@ import Driver from "../models/driver.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 
+// ========================= GENERATE TOKEN =========================
+const generateToken = (id) => {
+    return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
+};
+
 // ========================= REGISTER DRIVER =========================
 export const registerDriver = async (req, res) => {
     try {
@@ -10,7 +15,7 @@ export const registerDriver = async (req, res) => {
         // Check if email already exists
         const existingDriver = await Driver.findOne({ email });
         if (existingDriver) {
-            return res.status(400).json({ message: "Email already registered" });
+            return res.status(400).json({ message: "Email already registered", success: false });
         }
 
         // Hash password
@@ -24,8 +29,13 @@ export const registerDriver = async (req, res) => {
             password: hashedPassword
         });
 
+        // Create token
+        const token = generateToken(newDriver._id);
+
         res.status(201).json({
             message: "Driver registered successfully",
+            success: true,
+            token,
             driver: {
                 id: newDriver._id,
                 fullName: newDriver.fullName,
@@ -35,7 +45,7 @@ export const registerDriver = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: error.message, success: false });
     }
 };
 
@@ -47,24 +57,21 @@ export const loginDriver = async (req, res) => {
 
         const driver = await Driver.findOne({ email });
         if (!driver) {
-            return res.status(400).json({ message: "Invalid email or password" });
+            return res.status(400).json({ message: "Invalid email or password", success: false });
         }
 
         // Compare passwords
         const isMatch = await bcrypt.compare(password, driver.password);
         if (!isMatch) {
-            return res.status(400).json({ message: "Invalid email or password" });
+            return res.status(400).json({ message: "Invalid email or password", success: false});
         }
 
-        // Generate JWT
-        const token = jwt.sign(
-            { id: driver._id },
-            process.env.JWT_SECRET,
-            { expiresIn: "7d" }
-        );
+        // Generate token
+        const token = generateToken(driver._id);
 
         res.status(200).json({
             message: "Login successful",
+            success: true,
             token,
             driver: {
                 id: driver._id,
@@ -75,6 +82,6 @@ export const loginDriver = async (req, res) => {
         });
 
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        res.status(500).json({ message: error.message, success: false});
     }
 };
