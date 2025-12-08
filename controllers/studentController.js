@@ -2,84 +2,101 @@ import Student from "../models/student.js";
 import bcrypt from "bcryptjs";
 import { isValidEmail, isValidMatricNumber } from "../utils/validator.js";
 import { signToken } from "../utils/jwts.js";
+import { mailer } from "../utils/mailer.js";
 
 export async function registerStudent(req, res) {
     try {
-        const {email, matricNo, fullName, password } = req.body;
+        const { email, matricNo, fullName, password } = req.body;
 
         if (!email || !matricNo || !fullName || !password) {
-            return res.status(400).json({
-                success: false,
-                message: "All fields are required"
-            });
+            return res.status(400).json({ success: false, message: "All fields are required" });
         }
 
-        // Validate email format
         if (!isValidEmail(email)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid email format"
-            });
+            return res.status(400).json({ success: false, message: "Invalid email format" });
         }
 
-        // Validate matric number format
         if (!isValidMatricNumber(matricNo)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid matric number format"
-            });
+            return res.status(400).json({ success: false, message: "Invalid matric number format" });
         }
 
-        const existingMatric = await Student.findOne({ matricNo });
-        if (existingMatric) {
-            return res.status(400).json({
-                success: false,
-                message: "Matric number already registered"
-            });
-        }
-
-        const existingEmail = await Student.findOne({ email });
-        if (existingEmail) {
-            return res.status(400).json({
-                success: false,
-                message: "Email already registered"
-            });
+        const existing = await Student.findOne({ $or: [{ email }, { matricNo }] });
+        if (existing) {
+            return res.status(400).json({ success: false, message: "Student already registered" });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
 
-        const newStudent = await Student.create({
+        // Generate OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiry = Date.now() + 15 * 60 * 1000; // 15 mins
+
+        const student = await Student.create({
             fullName,
             matricNo,
             email,
-            password: hashedPassword
+            password: hashedPassword,
+            emailOTP: otp,
+            otpExpires: otpExpiry
         });
 
-        // Sign JWT
-        const token = signToken({
-            id: newStudent._id,
-            email: newStudent.email
+        // Send OTP email
+        await mailer.sendMail({
+            from: process.env.MAIL_USER,
+            to: email,
+            subject: "Verify Your Student Email",
+            html: `
+                <h2>Hello ${fullName}</h2>
+                <p>Your OTP for email verification is:</p>
+                <h1>${otp}</h1>
+                <p>This OTP expires in 15 minutes.</p>
+            `
         });
 
         return res.status(201).json({
             success: true,
-            message: "Student registered successfully",
-            token,
-            student: {
-                id: newStudent._id,
-                fullName: newStudent.fullName,
-                matricNo: newStudent.matricNo,
-                email: newStudent.email
-            }
+            message: "Registration successful. OTP sent to email.",
+            studentId: student._id
         });
 
     } catch (error) {
-        console.log(error);
-        return res.status(500).json({
-            success: false,
-            message: "Server error",
-            error: error.message
+        return res.status(500).json({ success: false, message: "Server error", error: error.message });
+    }
+}
+
+// verify email function
+export async function verifyStudentEmail(req, res) {
+    try {
+        const { email, otp } = req.body;
+
+        const student = await Student.findOne({email});
+        if (!student) {
+            return res.status(404).json({ success: false, message: "Student not found" });
+        }
+
+        if (student.isVerified) {
+            return res.status(400).json({ success: false, message: "Email already verified" });
+        }
+
+        if (student.emailOTP !== otp) {
+            return res.status(400).json({ success: false, message: "Invalid OTP" });
+        }
+
+        if (student.otpExpires < Date.now()) {
+            return res.status(400).json({ success: false, message: "OTP expired" });
+        }
+
+        student.isVerified = true;
+        student.emailOTP = null;
+        student.otpExpires = null;
+        await student.save();
+
+        return res.status(200).json({
+            success: true,
+            message: "Email verified successfully"
         });
+    } catch (error) {
+        return res.status(500).json({ success: false, message: "Server error" });
     }
 }
 
@@ -88,64 +105,45 @@ export async function loginStudent(req, res) {
     try {
         const { email, password, matricNo } = req.body;
 
-        // Must provide email or matric number
-        if (!email && !matricNo) {
-            return res.status(400).json({
-                status: "fail",
-                message: "Provide email or matricNo to login",
-            });
-        }
-
-        // Password required
-        if (!password) {
-            return res.status(400).json({
-                status: "fail",
-                message: "Password is required",
-            });
-        }
-
-        // Validate email if provided
-        if (email && !isValidEmail(email)) {
-            return res.status(400).json({
-                status: "fail",
-                message: "Invalid student email format",
-            });
-        }
-
-        // Validate matric if provided
-        if (matricNo && !isValidMatricNumber(matricNo)) {
-            return res.status(400).json({
-                status: "fail",
-                message: "Invalid matric number format (YY/NNNN)",
-            });
-        }
-
-        // Find student by email or matric
+        // Find student
         const student = await Student.findOne({
-            $or: [{ email }, { matricNo }],
+            $or: [{ email }, { matricNo }]
         });
 
         if (!student) {
-            return res.status(404).json({
+            return res.status(404).json({ status: "fail", message: "Student not found" });
+        }
+
+        if (!student.isVerified) {
+            return res.status(403).json({
                 status: "fail",
-                message: "Student not found",
+                message: "Email not verified. Please verify before login."
             });
         }
 
         // Check password
         const isMatch = await bcrypt.compare(password, student.password);
         if (!isMatch) {
-            return res.status(401).json({
-                status: "fail",
-                message: "Incorrect password",
-            });
+            return res.status(401).json({ status: "fail", message: "Incorrect password" });
         }
 
-        // Generate JWT
-        const token = generateToken({
+        const token = signToken({
             id: student._id,
             email: student.email,
-            matricNo: student.matricNo,
+            matricNo: student.matricNo
+        });
+
+        // SEND LOGIN NOTIFICATION EMAIL
+        await mailer.sendMail({
+            from: process.env.MAIL_USER,
+            to: student.email,
+            subject: "Login Notification",
+            html: `
+                <h3>Hello ${student.fullName},</h3>
+                <p>Your account just logged in at:</p>
+                <p><strong>${new Date().toLocaleString()}</strong></p>
+                <p>If this wasn't you, change your password immediately.</p>
+            `
         });
 
         return res.status(200).json({
@@ -156,14 +154,84 @@ export async function loginStudent(req, res) {
                 id: student._id,
                 fullName: student.fullName,
                 email: student.email,
-                matricNo: student.matricNo,
-            },
+                matricNo: student.matricNo
+            }
         });
+
     } catch (err) {
-        console.error("Login Error:", err);
+        return res.status(500).json({ status: "error", message: "Internal server error" });
+    }
+}
+
+
+export async function resendVerificationOTP(req, res) {
+    try {
+        const { email, studentId } = req.body;
+
+        // Must provide something to identify the student
+        if (!email && !studentId) {
+            return res.status(400).json({
+                success: false,
+                message: "Email or studentId is required"
+            });
+        }
+
+        // Find student by email or ID
+        const student = await Student.findOne({
+            $or: [
+                { email: email?.toLowerCase() },
+                { _id: studentId }
+            ]
+        });
+
+        if (!student) {
+            return res.status(404).json({
+                success: false,
+                message: "Student not found"
+            });
+        }
+
+        // Check if already verified
+        if (student.isVerified) {
+            return res.status(400).json({
+                success: false,
+                message: "Email already verified"
+            });
+        }
+
+        // Generate NEW OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otpExpiry = Date.now() + 15 * 60 * 1000; // 15 min
+
+        student.emailOTP = otp;
+        student.otpExpires = otpExpiry;
+        await student.save();
+
+        // Send OTP mail
+        await mailer.sendMail({
+            from: process.env.MAIL_USER,
+            to: student.email,
+            subject: "Resend Email Verification OTP",
+            html: `
+                <h2>Hello ${student.fullName}</h2>
+                <p>Your new OTP for email verification is:</p>
+                <h1>${otp}</h1>
+                <p>This OTP will expire in 15 minutes.</p>
+            `
+        });
+
+        return res.status(200).json({
+            success: true,
+            message: "OTP resent successfully",
+            email: student.email
+        });
+
+    } catch (error) {
+        console.error("Resend OTP Error:", error);
         return res.status(500).json({
-            status: "error",
-            message: "Internal server error",
+            success: false,
+            message: "Server error",
+            error: error.message
         });
     }
 }
