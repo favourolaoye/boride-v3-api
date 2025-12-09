@@ -38,6 +38,10 @@ const studentSchema = new mongoose.Schema(
             type: String,
             default: null
         },
+        phoneNo: {
+            type: String,
+            default: null
+        },
 
         otpExpires: {
             type: Date,

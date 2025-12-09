@@ -6,9 +6,9 @@ import { mailer } from "../utils/mailer.js";
 
 export async function registerStudent(req, res) {
     try {
-        const { email, matricNo, fullName, password } = req.body;
+        const { email, matricNo, fullName, password , phoneNo } = req.body;
 
-        if (!email || !matricNo || !fullName || !password) {
+        if (!email || !matricNo || !fullName || !password || !phoneNo) {
             return res.status(400).json({ success: false, message: "All fields are required" });
         }
 
@@ -35,6 +35,7 @@ export async function registerStudent(req, res) {
             fullName,
             matricNo,
             email,
+            phoneNo,
             password: hashedPassword,
             emailOTP: otp,
             otpExpires: otpExpiry

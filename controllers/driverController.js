@@ -7,7 +7,7 @@ const generateToken = (id) => {
     return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: "7d" });
 };
 
-// ========================= REGISTER DRIVER =========================
+
 export const registerDriver = async (req, res) => {
     try {
         const { email, fullName, password, phoneNo } = req.body;
