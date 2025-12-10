@@ -6,7 +6,7 @@ import { mailer } from "../utils/mailer.js";
 
 export async function registerStudent(req, res) {
     try {
-        const { email, matricNo, fullName, password , phoneNo } = req.body;
+        const { email, matricNo, fullName, password, phoneNo } = req.body;
 
         if (!email || !matricNo || !fullName || !password || !phoneNo) {
             return res.status(400).json({ success: false, message: "All fields are required" });
@@ -70,7 +70,7 @@ export async function verifyStudentEmail(req, res) {
     try {
         const { email, otp } = req.body;
 
-        const student = await Student.findOne({email});
+        const student = await Student.findOne({ email });
         if (!student) {
             return res.status(404).json({ success: false, message: "Student not found" });
         }
@@ -105,6 +105,12 @@ export async function verifyStudentEmail(req, res) {
 export async function loginStudent(req, res) {
     try {
         const { email, password, matricNo } = req.body;
+        console.log({ email, password, matricNo })
+        if (!password || (!email && !matricNo)) {
+            return res
+                .status(400)
+                .json({ message: "Provide password and either email or matric number" });
+        }
 
         // Find student
         const student = await Student.findOne({
@@ -159,10 +165,13 @@ export async function loginStudent(req, res) {
             }
         });
 
-    } catch (err) {
-        return res.status(500).json({ status: "error", message: "Internal server error" });
-    }
+    } 
+    catch (err) {
+    console.error("LOGIN ERROR:", err);
+    return res.status(500).json({ status: "error", message: err.message });
 }
+}
+
 
 
 export async function resendVerificationOTP(req, res) {
