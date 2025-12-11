@@ -29,7 +29,7 @@ export async function registerStudent(req, res) {
 
         // Generate OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        const otpExpiry = Date.now() + 15 * 60 * 1000; // 15 mins
+        const otpExpiry = Date.now() + 15 * 60 * 1000; 
 
         const student = await Student.create({
             fullName,
