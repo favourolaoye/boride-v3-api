@@ -104,19 +104,15 @@ export async function verifyStudentEmail(req, res) {
 // Login
 export async function loginStudent(req, res) {
     try {
-        const { email, password, matricNo } = req.body;
-        console.log({ email, password, matricNo })
-        if (!password || (!email && !matricNo)) {
-            return res
-                .status(400)
-                .json({ message: "Provide password and either email or matric number" });
+        const { email, password } = req.body;
+        console.log({ email, password })
+        if (!password || !email ) {
+            return res.status(400).json({ message: "Provide password and either email or matric number" });
         }
 
         // Find student
-        const student = await Student.findOne({
-            $or: [{ email }, { matricNo }]
-        });
-
+        const student = await Student.findOne({email});
+ 
         if (!student) {
             return res.status(404).json({ status: "fail", message: "Student not found" });
         }
